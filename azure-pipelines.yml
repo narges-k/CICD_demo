@@ -1,1 +1,46 @@
+trigger:
+  - main
 
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  PYTHONPATH: '$(pwd)'
+
+strategy:
+  matrix:
+    Python310:
+      python.version: '3.10'
+    Python311:
+      python.version: '3.11'
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+      addToPath: true
+    displayName: 'Set up Python $(python.version)'
+
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+    displayName: 'Install dependencies'
+
+  - script: |
+      flake8 src/ tests/ --max-line-length=100
+    displayName: 'Run Flake8 Linter'
+
+  - script: |
+      pytest tests/ --junitxml=junit/test-results-$(python.version).xml --cov=src --cov-report=xml
+    displayName: 'Run pytest and code coverage'
+
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFiles: '**/test-results-*.xml'
+      testRunTitle: 'Processing Tests on Python $(python.version)'
+      
+  - task: PublishCodeCoverageResults@2
+    condition: succeededOrFailed()
+    inputs:
+      summaryFileLocation: '**/coverage.xml'
